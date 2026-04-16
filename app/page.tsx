@@ -611,8 +611,8 @@ export default function Home() {
 
   return (
     <main className="flex min-h-dvh w-full flex-col overflow-hidden bg-gradient-to-b from-[#2f3685] via-[#1b2157] to-[#0d102b] text-white">
-      <header className="flex items-center justify-between px-4 pb-2 pt-4 md:px-8 md:pt-6">
-        <div className="flex items-center gap-2">
+      <header className="relative flex items-center px-4 pb-2 pt-4 md:px-8 md:pt-6">
+        <div className="flex flex-1 items-center gap-2">
           <button
             onClick={resetChat}
             className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white/90 transition hover:bg-white/10"
@@ -626,8 +626,8 @@ export default function Home() {
             Chats
           </button>
         </div>
-        <p className="text-[24px] font-medium tracking-tight">ChatGPT</p>
-        <div className="flex items-center gap-2">
+        <p className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-[24px] font-medium tracking-tight">ChatGPT</p>
+        <div className="flex flex-1 items-center justify-end gap-2">
             <div className="relative">
               <button onClick={() => setShowUserMenu(!showUserMenu)} className="rounded-full p-1 hover:bg-white/10 transition">
                 <UserCircle2 className="h-6 w-6 text-white/85" />
