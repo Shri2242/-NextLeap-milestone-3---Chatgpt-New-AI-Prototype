@@ -610,8 +610,8 @@ export default function Home() {
   };
 
   return (
-    <main className="mx-auto flex h-dvh w-full max-w-[390px] flex-col overflow-hidden bg-gradient-to-b from-[#2f3685] via-[#1b2157] to-[#0d102b] text-white">
-      <header className="flex items-center justify-between px-5 pb-1 pt-4">
+    <main className="flex min-h-dvh w-full flex-col overflow-hidden bg-gradient-to-b from-[#2f3685] via-[#1b2157] to-[#0d102b] text-white">
+      <header className="flex items-center justify-between px-4 pb-2 pt-4 md:px-8 md:pt-6">
         <div className="flex items-center gap-2">
           <button
             onClick={resetChat}
@@ -658,8 +658,8 @@ export default function Home() {
       </header>
 
       {showSessionList && (
-        <section className="px-5 pb-4">
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-4 text-left text-white shadow-xl backdrop-blur">
+        <section className="px-4 pb-4 md:px-8">
+          <div className="mx-auto max-w-4xl rounded-3xl border border-white/10 bg-white/5 p-4 text-left text-white shadow-xl backdrop-blur">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <p className="text-lg font-semibold">Chat Sessions</p>
@@ -719,7 +719,7 @@ export default function Home() {
           </div>
         </section>
       )}
-      <section className="flex flex-1 flex-col items-center justify-center px-5 pb-2 text-center">
+      <section className="flex flex-1 flex-col items-center justify-center px-4 pb-2 text-center md:px-8">
         <div className="mb-5 rounded-2xl bg-white/95 p-2.5 shadow-xl">
           <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-[#7c8cff] to-[#5f6aff]" />
         </div>
@@ -763,9 +763,9 @@ export default function Home() {
         <p className="mt-3 text-[16px] text-white/88">{isListening ? "Live listening mode" : "Live listening mode"}</p>
       </section>
 
-      <section className="relative px-3 pb-5">
+      <section className="relative px-3 pb-5 md:px-8 md:pb-7">
         {showSpeakingPopup && !isVoiceMode && (
-          <div className="absolute -top-16 left-1/2 z-20 w-[92%] -translate-x-1/2 rounded-2xl bg-[#0f1333]/95 px-4 py-2.5 text-center text-sm text-white shadow-2xl ring-1 ring-white/20 backdrop-blur">
+          <div className="absolute -top-16 left-1/2 z-20 w-[92%] max-w-4xl -translate-x-1/2 rounded-2xl bg-[#0f1333]/95 px-4 py-2.5 text-center text-sm text-white shadow-2xl ring-1 ring-white/20 backdrop-blur">
             Are you speaking? Turn on the mic to capture your voice.
           </div>
         )}
@@ -793,7 +793,7 @@ export default function Home() {
         )}
 
         {messages.length > 0 && (
-          <div className="mb-3 max-h-36 space-y-2 overflow-y-auto rounded-2xl bg-black/20 p-2 ring-1 ring-white/10">
+          <div className="mx-auto mb-3 max-h-36 w-full max-w-4xl space-y-2 overflow-y-auto rounded-2xl bg-black/20 p-2 ring-1 ring-white/10 md:max-h-48">
             {messages.slice(-6).map((message) => (
               <div
                 key={message.id}
@@ -810,7 +810,7 @@ export default function Home() {
           </div>
         )}
 
-        <div className="flex h-11 items-center gap-2 rounded-full bg-[#202547]/95 px-3 backdrop-blur ring-1 ring-white/20">
+        <div className="mx-auto flex h-11 w-full max-w-4xl items-center gap-2 rounded-full bg-[#202547]/95 px-3 backdrop-blur ring-1 ring-white/20 md:h-12">
           <Sparkles className="h-4 w-4 text-white/75" />
           <input
             value={input}
