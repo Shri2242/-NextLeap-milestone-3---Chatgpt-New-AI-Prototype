@@ -150,6 +150,7 @@ export default function Home() {
   }, [idToken, chatSessions.length]);
 
   useEffect(() => {
+    if (!auth) return;
     const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {
       setUser(nextUser);
       if (nextUser) {
@@ -170,6 +171,7 @@ export default function Home() {
   }, [chatSessions]);
 
   const signIn = async () => {
+    if (!auth) { toast.error("Firebase is not configured."); return; }
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (error) {
@@ -189,6 +191,7 @@ export default function Home() {
   };
 
   const signOutUser = async () => {
+    if (!auth) return;
     try {
       await signOut(auth);
       setUser(null);

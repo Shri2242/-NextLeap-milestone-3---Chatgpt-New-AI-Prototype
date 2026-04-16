@@ -1,10 +1,11 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
+import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import {
   getAuth,
   GoogleAuthProvider,
   onAuthStateChanged,
   signInWithPopup,
   signOut,
+  type Auth,
   type User,
 } from "firebase/auth";
 
@@ -17,22 +18,20 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "",
 };
 
-// Validate Firebase config
 const isValidConfig = Object.values(firebaseConfig).every(
   (value) => value && typeof value === "string" && value.length > 0
 );
 
-if (!isValidConfig) {
-  console.warn(
-    "Firebase configuration is incomplete. Please set all NEXT_PUBLIC_FIREBASE_* environment variables."
-  );
-}
-
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const auth = getAuth(app);
+let app: FirebaseApp | null = null;
+let auth: Auth | null = null;
 const googleProvider = new GoogleAuthProvider();
+
+if (typeof window !== "undefined" && isValidConfig) {
+  app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+  auth = getAuth(app);
+}
 
 export { auth, googleProvider, onAuthStateChanged, signInWithPopup, signOut, type User };
 export async function getIdToken() {
-  return auth.currentUser ? await auth.currentUser.getIdToken() : null;
+  return auth?.currentUser ? await auth.currentUser.getIdToken() : null;
 }
