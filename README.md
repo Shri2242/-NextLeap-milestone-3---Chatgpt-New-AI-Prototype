@@ -112,15 +112,6 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## Deploy on Vercel
-
-1. Push your repo to GitHub
-2. Import the project at [vercel.com/new](https://vercel.com/new)
-3. Add all `.env.local` keys as **Environment Variables** in Vercel project settings
-4. Deploy — Vercel auto-builds on every push to `main`
-
----
-
 ## Security Notes
 
 - `.env.local` is gitignored — your secrets never enter the repo
