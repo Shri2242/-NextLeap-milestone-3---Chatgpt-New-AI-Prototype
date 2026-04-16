@@ -451,6 +451,20 @@ export default function Home() {
     }
   };
 
+  const resetChat = () => {
+    recognitionRef.current?.abort();
+    setMessages([]);
+    setInput("");
+    setIsSending(false);
+    setIsVoiceMode(false);
+    setIsListening(false);
+    setTranscript("");
+    setFinalTranscript("");
+    setInterimTranscript("");
+    setShowTranscriptionPill(false);
+    setShowSpeakingPopup(false);
+  };
+
   const sendTextMessage = () => {
     if (!input.trim()) {
       return;
@@ -463,7 +477,12 @@ export default function Home() {
   return (
     <main className="mx-auto flex h-dvh w-full max-w-[390px] flex-col overflow-hidden bg-gradient-to-b from-[#2f3685] via-[#1b2157] to-[#0d102b] text-white">
       <header className="flex items-center justify-between px-5 pb-1 pt-4">
-        <ArrowLeft className="h-5 w-5 text-white/90" strokeWidth={2.1} />
+        <button
+          onClick={resetChat}
+          className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white/90 transition hover:bg-white/10"
+        >
+          New Chat
+        </button>
         <p className="text-[24px] font-medium tracking-tight">ChatGPT</p>
         <UserCircle2 className="h-6 w-6 text-white/85" />
       </header>
