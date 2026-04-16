@@ -52,8 +52,8 @@ FIREBASE_SERVICE_ACCOUNT_KEY={"type":"service_account", ...}
 - `FIREBASE_SERVICE_ACCOUNT_KEY` should contain the JSON service account credentials (stringified). Keep this secret server-side only.
 
 ### Security Notes
-- API routes now require Firebase auth tokens.
-- Only authenticated users can call `/api/chat` and `/api/messages`.
+- Chat supports both guest and logged-in usage.
+- Firebase login remains optional from the user icon.
 - Keep `.env.local` out of version control.
 - For production, set the same env vars in your hosting provider, not in the repo.
 

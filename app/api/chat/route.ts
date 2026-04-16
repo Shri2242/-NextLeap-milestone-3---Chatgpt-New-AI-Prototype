@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
 import { saveChatMessage } from "@/lib/chat-store";
-import { firebaseAdminAuth } from "@/lib/firebase-admin";
 
 type RapidApiResponse = {
   result?: string;
@@ -18,9 +17,10 @@ async function verifyAuth(request: Request) {
     : null;
 
   if (!token) {
-    throw new Error("Unauthorized");
+    return null;
   }
 
+  const { firebaseAdminAuth } = await import("@/lib/firebase-admin");
   return firebaseAdminAuth.verifyIdToken(token);
 }
 

@@ -48,14 +48,12 @@ export default function Home() {
   const [showVoiceTip, setShowVoiceTip] = useState(false);
   const [ambientSpeechNudge, setAmbientSpeechNudge] = useState(false);
   const [showTranscriptionPill, setShowTranscriptionPill] = useState(false);
-  const [showWelcomeScreen, setShowWelcomeScreen] = useState(true);
-  const [hasEnteredProject, setHasEnteredProject] = useState(false);
   const [showSpeakingPopup, setShowSpeakingPopup] = useState(false);
   const [showSessionList, setShowSessionList] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string>("session-1");
   const [user, setUser] = useState<User | null>(null);
-  const [authInitializing, setAuthInitializing] = useState(true);
   const [idToken, setIdToken] = useState<string | null>(null);
   const [micPermission, setMicPermission] = useState<
     "unknown" | "granted" | "denied"
@@ -105,9 +103,6 @@ export default function Home() {
         setChatSessions(parsedSessions);
         setCurrentSessionId(parsedSessions[0].id);
         setMessages(parsedSessions[0].messages);
-        if (user) {
-          setShowWelcomeScreen(false);
-        }
         return;
       }
     }
@@ -159,12 +154,9 @@ export default function Home() {
       setUser(nextUser);
       if (nextUser) {
         setIdToken(await nextUser.getIdToken());
-        setShowWelcomeScreen(false);
-        setHasEnteredProject(true);
       } else {
         setIdToken(null);
       }
-      setAuthInitializing(false);
     });
 
     return unsubscribe;
@@ -181,6 +173,16 @@ export default function Home() {
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (error) {
+      const code =
+        typeof error === "object" && error !== null && "code" in error
+          ? String((error as { code?: string }).code)
+          : "";
+      if (code === "auth/configuration-not-found") {
+        toast.error(
+          "Login is not configured in Firebase yet. Enable Google Sign-In in Firebase Console > Authentication > Sign-in method."
+        );
+        return;
+      }
       const message = error instanceof Error ? error.message : "Sign-in failed.";
       toast.error(message);
     }
@@ -194,8 +196,6 @@ export default function Home() {
       setChatSessions([]);
       setMessages([]);
       setCurrentSessionId("session-1");
-      setShowWelcomeScreen(true);
-      setHasEnteredProject(false);
     } catch {
       toast.error("Failed to sign out. Please try again.");
     }
@@ -525,10 +525,6 @@ export default function Home() {
       content: clean,
       source,
     };
-    if (!idToken) {
-      toast.error("Please sign in to continue.");
-      return;
-    }
 
     setMessages((prev) => [...prev, userMessage]);
     setChatSessions((prev) =>
@@ -545,7 +541,7 @@ export default function Home() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`,
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
         },
         body: JSON.stringify({ message: clean, source }),
       });
@@ -610,112 +606,6 @@ export default function Home() {
     void sendMessage(toSend, "text");
   };
 
-  if (authInitializing) {
-    return (
-      <main className="mx-auto flex h-dvh w-full max-w-[390px] flex-col items-center justify-center bg-gradient-to-b from-[#2f3685] via-[#1b2157] to-[#0d102b] text-white">
-        <p className="text-lg">Loading...</p>
-      </main>
-    );
-  }
-
-  if (showWelcomeScreen && !hasEnteredProject) {
-    const handleCreateNewChat = () => {
-      if (!user) {
-        setHasEnteredProject(true);
-      } else {
-        setShowWelcomeScreen(false);
-        resetChat();
-      }
-    };
-
-    const handleViewHistory = () => {
-      if (!user) {
-        setHasEnteredProject(true);
-      } else {
-        setShowWelcomeScreen(false);
-      }
-    };
-
-    return (
-      <main className="mx-auto flex h-dvh w-full max-w-[390px] flex-col items-center justify-center bg-gradient-to-b from-[#2f3685] via-[#1b2157] to-[#0d102b] text-white px-5">
-        <div className="mb-6 rounded-3xl border border-white/10 bg-white/5 p-8 text-center shadow-2xl backdrop-blur max-w-[320px]">
-          <div className="mb-6 flex justify-center">
-            <Sparkles className="h-12 w-12 text-blue-400" />
-          </div>
-          <p className="mb-3 text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-            NextLeap Chat
-          </p>
-          <p className="mb-8 text-sm text-white/70">
-            Your AI-powered chat assistant with voice support for multiple languages
-          </p>
-          <div className="space-y-3">
-            <button
-              type="button"
-              onClick={handleCreateNewChat}
-              className="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
-            >
-              ✨ Create New Chat
-            </button>
-            <button
-              type="button"
-              onClick={handleViewHistory}
-              className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
-            >
-              📋 View History
-            </button>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  if (hasEnteredProject && !user) {
-    return (
-      <main className="mx-auto flex h-dvh w-full max-w-[390px] flex-col items-center justify-center bg-gradient-to-b from-[#2f3685] via-[#1b2157] to-[#0d102b] text-white px-5">
-        <div className="mb-6 rounded-3xl border border-white/10 bg-white/5 p-6 text-center shadow-2xl backdrop-blur">
-          <p className="mb-4 text-2xl font-semibold">Sign In Required</p>
-          <p className="mb-6 text-sm text-white/70">
-            Sign in with Google to use chat and save your sessions
-          </p>
-          <button
-            type="button"
-            onClick={signIn}
-            className="w-full rounded-full bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
-          >
-            Sign in with Google
-          </button>
-          <button
-            type="button"
-            onClick={() => setHasEnteredProject(false)}
-            className="mt-3 w-full rounded-full border border-white/20 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
-          >
-            Back
-          </button>
-        </div>
-      </main>
-    );
-  }
-
-  if (!user) {
-    return (
-      <main className="mx-auto flex h-dvh w-full max-w-[390px] flex-col items-center justify-center bg-gradient-to-b from-[#2f3685] via-[#1b2157] to-[#0d102b] text-white px-5">
-        <div className="mb-6 rounded-3xl border border-white/10 bg-white/5 p-6 text-center shadow-2xl backdrop-blur">
-          <p className="mb-4 text-3xl font-semibold">Welcome</p>
-          <p className="mb-6 text-sm text-white/70">
-            Sign in with Google to securely use the chat and keep your sessions private.
-          </p>
-          <button
-            type="button"
-            onClick={signIn}
-            className="w-full rounded-full bg-[#4c5cff] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#5b6cff]"
-          >
-            Sign in with Google
-          </button>
-        </div>
-      </main>
-    );
-  }
-
   return (
     <main className="mx-auto flex h-dvh w-full max-w-[390px] flex-col overflow-hidden bg-gradient-to-b from-[#2f3685] via-[#1b2157] to-[#0d102b] text-white">
       <header className="flex items-center justify-between px-5 pb-1 pt-4">
@@ -735,14 +625,32 @@ export default function Home() {
         </div>
         <p className="text-[24px] font-medium tracking-tight">ChatGPT</p>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={signOutUser}
-            className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white/90 transition hover:bg-white/10"
-          >
-            Logout
-          </button>
-          <UserCircle2 className="h-6 w-6 text-white/85" />
+            <div className="relative">
+              <button onClick={() => setShowUserMenu(!showUserMenu)} className="rounded-full p-1 hover:bg-white/10 transition">
+                <UserCircle2 className="h-6 w-6 text-white/85" />
+              </button>
+              {showUserMenu && (
+                <div className="absolute right-0 top-full mt-2 w-48 rounded-2xl border border-white/10 bg-white/5 p-3 shadow-xl backdrop-blur z-10">
+                  {user ? (
+                    <div className="space-y-2">
+                      <p className="text-sm text-white font-semibold">{user.displayName || user.email}</p>
+                      <button onClick={() => { signOutUser(); setShowUserMenu(false); }} className="w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
+                        Logout
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <button onClick={() => { signIn(); setShowUserMenu(false); }} className="w-full rounded-xl bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-blue-700">
+                        Login
+                      </button>
+                      <button onClick={() => { signIn(); setShowUserMenu(false); }} className="w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
+                        Sign Up
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
         </div>
       </header>
 
