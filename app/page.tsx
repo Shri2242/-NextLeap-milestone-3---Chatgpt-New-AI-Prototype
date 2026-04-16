@@ -28,6 +28,13 @@ type ChatMessage = {
   source: "text" | "voice" | "assistant";
 };
 
+type ChatSession = {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: string;
+};
+
 export default function Home() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -41,8 +48,9 @@ export default function Home() {
   const [ambientSpeechNudge, setAmbientSpeechNudge] = useState(false);
   const [showTranscriptionPill, setShowTranscriptionPill] = useState(false);
   const [showSpeakingPopup, setShowSpeakingPopup] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
-  const [historyMessages, setHistoryMessages] = useState<ChatMessage[]>([]);
+  const [showSessionList, setShowSessionList] = useState(false);
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string>("session-1");
   const [micPermission, setMicPermission] = useState<
     "unknown" | "granted" | "denied"
   >("unknown");
@@ -83,19 +91,46 @@ export default function Home() {
   useEffect(() => {
     void (async () => {
       try {
+        if (typeof window !== "undefined") {
+          const storedSessions = window.localStorage.getItem("chatSessions");
+          if (storedSessions) {
+            const parsedSessions: ChatSession[] = JSON.parse(storedSessions);
+            if (parsedSessions.length > 0) {
+              setChatSessions(parsedSessions);
+              setCurrentSessionId(parsedSessions[0].id);
+              setMessages(parsedSessions[0].messages);
+              return;
+            }
+          }
+        }
+
         const response = await fetch("/api/messages");
         if (!response.ok) {
           return;
         }
         const data = (await response.json()) as { messages?: ChatMessage[] };
         const fetchedMessages = data.messages ?? [];
+        const initialSession: ChatSession = {
+          id: `session-${Date.now()}`,
+          title: "Session 1",
+          messages: fetchedMessages,
+          createdAt: new Date().toISOString(),
+        };
         setMessages(fetchedMessages);
-        setHistoryMessages(fetchedMessages);
+        setChatSessions([initialSession]);
+        setCurrentSessionId(initialSession.id);
       } catch {
         // Ignore initial fetch errors to keep UI usable.
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    window.localStorage.setItem("chatSessions", JSON.stringify(chatSessions));
+  }, [chatSessions]);
 
   const getSpeechRecognition = () => {
     if (typeof window === "undefined") {
@@ -422,8 +457,13 @@ export default function Home() {
       source,
     };
     setMessages((prev) => [...prev, userMessage]);
-    setHistoryMessages((prev) => [...prev, userMessage]);
-    setIsSending(true);
+    setChatSessions((prev) =>
+      prev.map((session) =>
+        session.id === currentSessionId
+          ? { ...session, messages: [...session.messages, userMessage] }
+          : session
+      )
+    );    setIsSending(true);
 
     try {
       const response = await fetch("/api/chat", {
@@ -438,24 +478,20 @@ export default function Home() {
       }
       const assistantReply = data.reply;
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `local-assistant-${Date.now()}`,
-          role: "assistant",
-          content: assistantReply,
-          source: "assistant",
-        },
-      ]);
-      setHistoryMessages((prev) => [
-        ...prev,
-        {
-          id: `local-assistant-${Date.now()}`,
-          role: "assistant",
-          content: assistantReply,
-          source: "assistant",
-        },
-      ]);
+      const assistantMessage: ChatMessage = {
+        id: `local-assistant-${Date.now()}`,
+        role: "assistant",
+        content: assistantReply,
+        source: "assistant",
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+      setChatSessions((prev) =>
+        prev.map((session) =>
+          session.id === currentSessionId
+            ? { ...session, messages: [...session.messages, assistantMessage] }
+            : session
+        )
+      );
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Chat request failed.";
@@ -467,6 +503,14 @@ export default function Home() {
 
   const resetChat = () => {
     recognitionRef.current?.abort();
+    const newSession: ChatSession = {
+      id: `session-${Date.now()}`,
+      title: `Chat ${chatSessions.length + 1}`,
+      messages: [],
+      createdAt: new Date().toISOString(),
+    };
+    setChatSessions((prev) => [newSession, ...prev]);
+    setCurrentSessionId(newSession.id);
     setMessages([]);
     setInput("");
     setIsSending(false);
@@ -499,52 +543,72 @@ export default function Home() {
             New Chat
           </button>
           <button
-            onClick={() => setShowHistory((value) => !value)}
+            onClick={() => setShowSessionList((value) => !value)}
             className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white/90 transition hover:bg-white/10"
           >
-            History
+            Chats
           </button>
         </div>
         <p className="text-[24px] font-medium tracking-tight">ChatGPT</p>
         <UserCircle2 className="h-6 w-6 text-white/85" />
       </header>
 
-      {showHistory && (
+      {showSessionList && (
         <section className="px-5 pb-4">
           <div className="rounded-3xl border border-white/10 bg-white/5 p-4 text-left text-white shadow-xl backdrop-blur">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <p className="text-lg font-semibold">Chat History</p>
+                <p className="text-lg font-semibold">Chat Sessions</p>
                 <p className="text-sm text-white/70">
-                  {historyMessages.length} saved messages
+                  {chatSessions.length} saved session{chatSessions.length === 1 ? "" : "s"}
                 </p>
               </div>
               <button
-                onClick={() => setShowHistory(false)}
+                onClick={() => setShowSessionList(false)}
                 className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white/90 transition hover:bg-white/10"
               >
                 Close
               </button>
             </div>
             <div className="space-y-3 max-h-[280px] overflow-y-auto pr-1">
-              {historyMessages.length === 0 ? (
-                <p className="text-sm text-white/70">No chat history available yet.</p>
+              {chatSessions.length === 0 ? (
+                <p className="text-sm text-white/70">No saved chats yet.</p>
               ) : (
-                historyMessages.map((message) => (
-                  <div
-                    key={message.id}
+                chatSessions.map((session) => (
+                  <button
+                    type="button"
+                    key={session.id}
+                    onClick={() => {
+                      setCurrentSessionId(session.id);
+                      setMessages(session.messages);
+                      setShowSessionList(false);
+                    }}
                     className={cn(
-                      "rounded-2xl px-3 py-2 text-sm leading-relaxed",
-                      message.role === "assistant"
-                        ? "bg-white/10 text-white"
-                        : "bg-[#4c5cff]/20 text-white"
+                      "w-full rounded-2xl border px-3 py-3 text-left text-sm transition",
+                      session.id === currentSessionId
+                        ? "border-blue-300 bg-white/10"
+                        : "border-white/10 bg-white/5 hover:bg-white/10"
                     )}
                   >
-                    <span className="block text-[11px] uppercase text-white/60">
-                      {message.role === "assistant" ? "Assistant" : "You"}
-                    </span>
-                    {message.content}
-                  </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-white">{session.title}</p>
+                        <p className="mt-1 text-xs text-white/65">
+                          {session.messages.length} messages
+                        </p>
+                      </div>
+                      <span className="text-[11px] uppercase tracking-[0.18em] text-white/60">
+                        {new Date(session.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    {session.messages[session.messages.length - 1] ? (
+                      <p className="mt-3 text-[13px] leading-5 text-white/70 line-clamp-2">
+                        {session.messages[session.messages.length - 1].content}
+                      </p>
+                    ) : (
+                      <p className="mt-3 text-[13px] leading-5 text-white/70">Start a new chat.</p>
+                    )}
+                  </button>
                 ))
               )}
             </div>
