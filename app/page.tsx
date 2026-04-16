@@ -41,6 +41,8 @@ export default function Home() {
   const [ambientSpeechNudge, setAmbientSpeechNudge] = useState(false);
   const [showTranscriptionPill, setShowTranscriptionPill] = useState(false);
   const [showSpeakingPopup, setShowSpeakingPopup] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyMessages, setHistoryMessages] = useState<ChatMessage[]>([]);
   const [micPermission, setMicPermission] = useState<
     "unknown" | "granted" | "denied"
   >("unknown");
@@ -86,7 +88,9 @@ export default function Home() {
           return;
         }
         const data = (await response.json()) as { messages?: ChatMessage[] };
-        setMessages(data.messages ?? []);
+        const fetchedMessages = data.messages ?? [];
+        setMessages(fetchedMessages);
+        setHistoryMessages(fetchedMessages);
       } catch {
         // Ignore initial fetch errors to keep UI usable.
       }
@@ -418,6 +422,7 @@ export default function Home() {
       source,
     };
     setMessages((prev) => [...prev, userMessage]);
+    setHistoryMessages((prev) => [...prev, userMessage]);
     setIsSending(true);
 
     try {
@@ -434,6 +439,15 @@ export default function Home() {
       const assistantReply = data.reply;
 
       setMessages((prev) => [
+        ...prev,
+        {
+          id: `local-assistant-${Date.now()}`,
+          role: "assistant",
+          content: assistantReply,
+          source: "assistant",
+        },
+      ]);
+      setHistoryMessages((prev) => [
         ...prev,
         {
           id: `local-assistant-${Date.now()}`,
@@ -477,16 +491,66 @@ export default function Home() {
   return (
     <main className="mx-auto flex h-dvh w-full max-w-[390px] flex-col overflow-hidden bg-gradient-to-b from-[#2f3685] via-[#1b2157] to-[#0d102b] text-white">
       <header className="flex items-center justify-between px-5 pb-1 pt-4">
-        <button
-          onClick={resetChat}
-          className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white/90 transition hover:bg-white/10"
-        >
-          New Chat
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={resetChat}
+            className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white/90 transition hover:bg-white/10"
+          >
+            New Chat
+          </button>
+          <button
+            onClick={() => setShowHistory((value) => !value)}
+            className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white/90 transition hover:bg-white/10"
+          >
+            History
+          </button>
+        </div>
         <p className="text-[24px] font-medium tracking-tight">ChatGPT</p>
         <UserCircle2 className="h-6 w-6 text-white/85" />
       </header>
 
+      {showHistory && (
+        <section className="px-5 pb-4">
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-4 text-left text-white shadow-xl backdrop-blur">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-lg font-semibold">Chat History</p>
+                <p className="text-sm text-white/70">
+                  {historyMessages.length} saved messages
+                </p>
+              </div>
+              <button
+                onClick={() => setShowHistory(false)}
+                className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white/90 transition hover:bg-white/10"
+              >
+                Close
+              </button>
+            </div>
+            <div className="space-y-3 max-h-[280px] overflow-y-auto pr-1">
+              {historyMessages.length === 0 ? (
+                <p className="text-sm text-white/70">No chat history available yet.</p>
+              ) : (
+                historyMessages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={cn(
+                      "rounded-2xl px-3 py-2 text-sm leading-relaxed",
+                      message.role === "assistant"
+                        ? "bg-white/10 text-white"
+                        : "bg-[#4c5cff]/20 text-white"
+                    )}
+                  >
+                    <span className="block text-[11px] uppercase text-white/60">
+                      {message.role === "assistant" ? "Assistant" : "You"}
+                    </span>
+                    {message.content}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </section>
+      )}
       <section className="flex flex-1 flex-col items-center justify-center px-5 pb-2 text-center">
         <div className="mb-5 rounded-2xl bg-white/95 p-2.5 shadow-xl">
           <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-[#7c8cff] to-[#5f6aff]" />
