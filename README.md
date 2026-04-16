@@ -1,44 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# NextLeap AI Chat — GPT-4 Prototype
 
-## Getting Started
+A full-stack AI chat app built with Next.js, Supabase, Firebase Auth, and the GPT-4 API via RapidAPI. Supports both guest and authenticated users, voice input, live transcription, and persistent chat history.
 
-First, run the development server:
+---
+
+## How I Built This
+
+1. **Scaffolded** the project with `create-next-app` (TypeScript + Tailwind CSS + App Router)
+2. **Built the chat UI** in `app/page.tsx` — full-screen layout, message bubbles, voice mode toggle, and a session list sidebar
+3. **Connected the AI** by wiring `app/api/chat/route.ts` to the RapidAPI `chatgpt-42` endpoint, which forwards user messages and streams back GPT-4 responses
+4. **Added Supabase** for persistent storage — every message (user + assistant) is saved to a `chat_messages` table via `lib/chat-store.ts`
+5. **Integrated Firebase Auth** for optional Google Sign-In — users can chat as guests or log in via the user icon (top-right). Server-side token verification in API routes allows both flows
+6. **Added voice input** using the Web Speech API (`SpeechRecognition`) — live transcription appears in the text field, and ambient speech detection auto-activates in voice mode
+7. **Secured the project** — `.env.local` is gitignored, `.env.example` is committed as a safe blank template, no secrets ever touch the repo
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 15 (App Router, TypeScript) |
+| Styling | Tailwind CSS |
+| AI API | RapidAPI — chatgpt-42 (GPT-4) |
+| Database | Supabase (PostgreSQL) |
+| Auth | Firebase Authentication (Google Sign-In) |
+| Voice | Web Speech API (SpeechRecognition) |
+| Deployment | Vercel |
+
+---
+
+## Getting Started (Run Locally)
+
+### 1. Clone the repo
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/Shri2242/-NextLeap-milestone-3---Chatgpt-New-AI-Prototype.git
+cd NextLeap-milestone-3---Chatgpt-New-AI-Prototype
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Install dependencies
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 3. Set up environment variables
 
-## Environment Variables
+Copy the template and fill in your own keys:
 
-To connect Supabase, create a `.env.local` file in the project root with:
+```bash
+cp .env.example .env.local
+```
+
+Open `.env.local` and add your values:
 
 ```env
 SUPABASE_URL=your-supabase-project-url
 SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 RAPIDAPI_KEY=your-rapidapi-key
-```
-
-- `SUPABASE_URL`: your Supabase project URL, found in Supabase Settings > API.
-- `SUPABASE_SERVICE_ROLE_KEY`: the server-side service role key from Supabase Settings > API.
-
-Then restart the Next.js dev server.
-
-### Firebase Authentication
-Add these env vars to your `.env.local`:
-
-```env
 NEXT_PUBLIC_FIREBASE_API_KEY=your-firebase-api-key
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
@@ -48,33 +68,61 @@ NEXT_PUBLIC_FIREBASE_APP_ID=your-app-id
 FIREBASE_SERVICE_ACCOUNT_KEY={"type":"service_account", ...}
 ```
 
-- `NEXT_PUBLIC_FIREBASE_*` values come from Firebase Console > Project settings.
-- `FIREBASE_SERVICE_ACCOUNT_KEY` should contain the JSON service account credentials (stringified). Keep this secret server-side only.
+**Where to get each key:**
+- `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` → [Supabase Dashboard](https://supabase.com) > Project Settings > API
+- `RAPIDAPI_KEY` → [RapidAPI](https://rapidapi.com) > Subscribe to `chatgpt-42` API > Your Apps > keys
+- `NEXT_PUBLIC_FIREBASE_*` → [Firebase Console](https://console.firebase.google.com) > Project Settings > Your apps > Web app config
+- `FIREBASE_SERVICE_ACCOUNT_KEY` → Firebase Console > Project Settings > Service Accounts > Generate new private key (paste the entire JSON as one line)
 
-### Security Notes
-- Chat supports both guest and logged-in usage.
-- Firebase login remains optional from the user icon.
-- Keep `.env.local` out of version control.
-- For production, set the same env vars in your hosting provider, not in the repo.
+### 4. Set up the Supabase database
 
-### ✅ Supabase Connection Status
-- Database schema applied
-- API endpoints tested and working
-- Environment variables configured
-- Firebase authentication enabled
-- Ready for deployment
+In your [Supabase SQL Editor](https://supabase.com/dashboard/project/_/sql), run the contents of `supabase-schema.sql`:
 
-## Learn More
+```sql
+create table if not exists public.chat_messages (
+  id uuid primary key default gen_random_uuid(),
+  role text not null check (role in ('user', 'assistant')),
+  source text not null check (source in ('text', 'voice', 'assistant')),
+  content text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists chat_messages_created_at_idx
+  on public.chat_messages (created_at desc);
+```
 
-To learn more about Next.js, take a look at the following resources:
+### 5. Run the development server
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm run dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+---
+
+## Features
+
+- **Guest chat** — no login required, start chatting immediately
+- **Google Sign-In** — optional, via user icon top-right
+- **Voice mode** — click the mic to speak; live transcription appears in the input field
+- **Ambient speech detection** — in voice mode, the mic auto-listens between messages
+- **Persistent history** — all messages stored in Supabase, loaded on page open
+- **Session sidebar** — grouped conversation history by date
+- **Mobile-optimized** — designed for 390px viewport
+
+---
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Push your repo to GitHub
+2. Import the project at [vercel.com/new](https://vercel.com/new)
+3. Add all `.env.local` keys as **Environment Variables** in Vercel project settings
+4. Deploy — Vercel auto-builds on every push to `main`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## Security Notes
+
+- `.env.local` is gitignored — your secrets never enter the repo
+- `.env.example` is the only env file committed — it contains no real values
+- For production, set all env vars through your hosting provider's dashboard
