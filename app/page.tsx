@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { User } from "firebase/auth";
 import {
-  ArrowLeft,
   Camera,
   Loader2,
   Mic,
@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { auth, googleProvider, onAuthStateChanged, signInWithPopup, signOut } from "@/lib/firebase-client";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -51,6 +52,9 @@ export default function Home() {
   const [showSessionList, setShowSessionList] = useState(false);
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string>("session-1");
+  const [user, setUser] = useState<User | null>(null);
+  const [authInitializing, setAuthInitializing] = useState(true);
+  const [idToken, setIdToken] = useState<string | null>(null);
   const [micPermission, setMicPermission] = useState<
     "unknown" | "granted" | "denied"
   >("unknown");
@@ -89,22 +93,42 @@ export default function Home() {
   }, [transcript]);
 
   useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const storedSessions = window.localStorage.getItem("chatSessions");
+    if (storedSessions) {
+      const parsedSessions: ChatSession[] = JSON.parse(storedSessions);
+      if (parsedSessions.length > 0) {
+        setChatSessions(parsedSessions);
+        setCurrentSessionId(parsedSessions[0].id);
+        setMessages(parsedSessions[0].messages);
+        return;
+      }
+    }
+
+    const initialSession: ChatSession = {
+      id: `session-${Date.now()}`,
+      title: "Session 1",
+      messages: [],
+      createdAt: new Date().toISOString(),
+    };
+    setChatSessions([initialSession]);
+    setCurrentSessionId(initialSession.id);
+  }, []);
+
+  useEffect(() => {
+    if (!idToken || chatSessions.length > 0) {
+      return;
+    }
+
     void (async () => {
       try {
-        if (typeof window !== "undefined") {
-          const storedSessions = window.localStorage.getItem("chatSessions");
-          if (storedSessions) {
-            const parsedSessions: ChatSession[] = JSON.parse(storedSessions);
-            if (parsedSessions.length > 0) {
-              setChatSessions(parsedSessions);
-              setCurrentSessionId(parsedSessions[0].id);
-              setMessages(parsedSessions[0].messages);
-              return;
-            }
-          }
-        }
-
-        const response = await fetch("/api/messages");
+        const response = await fetch("/api/messages", {
+          headers: {
+            Authorization: `Bearer ${idToken}`,
+          },
+        });
         if (!response.ok) {
           return;
         }
@@ -120,9 +144,23 @@ export default function Home() {
         setChatSessions([initialSession]);
         setCurrentSessionId(initialSession.id);
       } catch {
-        // Ignore initial fetch errors to keep UI usable.
+        // Ignore initial fetch errors.
       }
     })();
+  }, [idToken, chatSessions.length]);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {
+      setUser(nextUser);
+      if (nextUser) {
+        setIdToken(await nextUser.getIdToken());
+      } else {
+        setIdToken(null);
+      }
+      setAuthInitializing(false);
+    });
+
+    return unsubscribe;
   }, []);
 
   useEffect(() => {
@@ -131,6 +169,28 @@ export default function Home() {
     }
     window.localStorage.setItem("chatSessions", JSON.stringify(chatSessions));
   }, [chatSessions]);
+
+  const signIn = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Sign-in failed.";
+      toast.error(message);
+    }
+  };
+
+  const signOutUser = async () => {
+    try {
+      await signOut(auth);
+      setUser(null);
+      setIdToken(null);
+      setChatSessions([]);
+      setMessages([]);
+      setCurrentSessionId("session-1");
+    } catch {
+      toast.error("Failed to sign out. Please try again.");
+    }
+  };
 
   const getSpeechRecognition = () => {
     if (typeof window === "undefined") {
@@ -456,6 +516,11 @@ export default function Home() {
       content: clean,
       source,
     };
+    if (!idToken) {
+      toast.error("Please sign in to continue.");
+      return;
+    }
+
     setMessages((prev) => [...prev, userMessage]);
     setChatSessions((prev) =>
       prev.map((session) =>
@@ -463,12 +528,16 @@ export default function Home() {
           ? { ...session, messages: [...session.messages, userMessage] }
           : session
       )
-    );    setIsSending(true);
+    );
+    setIsSending(true);
 
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
         body: JSON.stringify({ message: clean, source }),
       });
 
@@ -532,6 +601,34 @@ export default function Home() {
     void sendMessage(toSend, "text");
   };
 
+  if (authInitializing) {
+    return (
+      <main className="mx-auto flex h-dvh w-full max-w-[390px] flex-col items-center justify-center bg-gradient-to-b from-[#2f3685] via-[#1b2157] to-[#0d102b] text-white">
+        <p className="text-lg">Initializing authentication...</p>
+      </main>
+    );
+  }
+
+  if (!user) {
+    return (
+      <main className="mx-auto flex h-dvh w-full max-w-[390px] flex-col items-center justify-center bg-gradient-to-b from-[#2f3685] via-[#1b2157] to-[#0d102b] text-white px-5">
+        <div className="mb-6 rounded-3xl border border-white/10 bg-white/5 p-6 text-center shadow-2xl backdrop-blur">
+          <p className="mb-4 text-3xl font-semibold">Welcome</p>
+          <p className="mb-6 text-sm text-white/70">
+            Sign in with Google to securely use the chat and keep your sessions private.
+          </p>
+          <button
+            type="button"
+            onClick={signIn}
+            className="w-full rounded-full bg-[#4c5cff] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#5b6cff]"
+          >
+            Sign in with Google
+          </button>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto flex h-dvh w-full max-w-[390px] flex-col overflow-hidden bg-gradient-to-b from-[#2f3685] via-[#1b2157] to-[#0d102b] text-white">
       <header className="flex items-center justify-between px-5 pb-1 pt-4">
@@ -550,7 +647,16 @@ export default function Home() {
           </button>
         </div>
         <p className="text-[24px] font-medium tracking-tight">ChatGPT</p>
-        <UserCircle2 className="h-6 w-6 text-white/85" />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={signOutUser}
+            className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white/90 transition hover:bg-white/10"
+          >
+            Logout
+          </button>
+          <UserCircle2 className="h-6 w-6 text-white/85" />
+        </div>
       </header>
 
       {showSessionList && (

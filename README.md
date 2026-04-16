@@ -35,10 +35,33 @@ RAPIDAPI_KEY=your-rapidapi-key
 
 Then restart the Next.js dev server.
 
+### Firebase Authentication
+Add these env vars to your `.env.local`:
+
+```env
+NEXT_PUBLIC_FIREBASE_API_KEY=your-firebase-api-key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
+NEXT_PUBLIC_FIREBASE_APP_ID=your-app-id
+FIREBASE_SERVICE_ACCOUNT_KEY={"type":"service_account", ...}
+```
+
+- `NEXT_PUBLIC_FIREBASE_*` values come from Firebase Console > Project settings.
+- `FIREBASE_SERVICE_ACCOUNT_KEY` should contain the JSON service account credentials (stringified). Keep this secret server-side only.
+
+### Security Notes
+- API routes now require Firebase auth tokens.
+- Only authenticated users can call `/api/chat` and `/api/messages`.
+- Keep `.env.local` out of version control.
+- For production, set the same env vars in your hosting provider, not in the repo.
+
 ### ✅ Supabase Connection Status
 - Database schema applied
 - API endpoints tested and working
 - Environment variables configured
+- Firebase authentication enabled
 - Ready for deployment
 
 ## Learn More

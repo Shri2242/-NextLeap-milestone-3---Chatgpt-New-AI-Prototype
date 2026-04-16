@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { saveChatMessage } from "@/lib/chat-store";
+import { firebaseAdminAuth } from "@/lib/firebase-admin";
 
 type RapidApiResponse = {
   result?: string;
@@ -9,6 +10,19 @@ type RapidApiResponse = {
   data?: { content?: string };
   choices?: Array<{ message?: { content?: string } }>;
 };
+
+async function verifyAuth(request: Request) {
+  const authHeader = request.headers.get("Authorization") || "";
+  const token = authHeader.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : null;
+
+  if (!token) {
+    throw new Error("Unauthorized");
+  }
+
+  return firebaseAdminAuth.verifyIdToken(token);
+}
 
 function parseAssistantText(payload: RapidApiResponse): string {
   return (
@@ -23,6 +37,7 @@ function parseAssistantText(payload: RapidApiResponse): string {
 
 export async function POST(request: Request) {
   try {
+    await verifyAuth(request);
     const body = await request.json();
     const message = String(body?.message ?? "").trim();
     const source = body?.source === "voice" ? "voice" : "text";
@@ -79,10 +94,10 @@ export async function POST(request: Request) {
     await saveChatMessage("assistant", assistantMessage, "assistant");
 
     return NextResponse.json({ reply: assistantMessage });
-  } catch {
-    return NextResponse.json(
-      { error: "Unexpected server error while processing chat." },
-      { status: 500 }
-    );
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unexpected server error while processing chat.";
+    const status = message === "Unauthorized" ? 401 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }
