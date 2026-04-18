@@ -1,3 +1,6 @@
+Live Webapp: https://next-leap-milestone-3-chatgpt-new-a.vercel.app/
+
+
 # NextLeap AI Chat — GPT-4 Prototype
 
 A full-stack AI chat app built with Next.js, Supabase, Firebase Auth, and the GPT-4 API via RapidAPI. Supports both guest and authenticated users, voice input, live transcription, and persistent chat history.
