@@ -3,14 +3,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { User } from "firebase/auth";
 import {
-  Camera,
+  ChevronDown,
   Loader2,
   Mic,
+  Moon,
   Pause,
+  Plus,
   SendHorizontal,
-  Sparkles,
+  Sun,
   UserCircle2,
-  Volume2,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -36,8 +37,17 @@ type ChatSession = {
   createdAt: string;
 };
 
+type PendingUpload = {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+};
+
 export default function Home() {
+  const [theme, setTheme] = useState<"light" | "dark">("light");
   const [input, setInput] = useState("");
+  const [selectedUploads, setSelectedUploads] = useState<PendingUpload[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [isVoiceMode, setIsVoiceMode] = useState(false);
@@ -46,7 +56,7 @@ export default function Home() {
   const [finalTranscript, setFinalTranscript] = useState<string>("");
   const [interimTranscript, setInterimTranscript] = useState<string>("");
   const [showVoiceTip, setShowVoiceTip] = useState(false);
-  const [ambientSpeechNudge, setAmbientSpeechNudge] = useState(false);
+  const [, setAmbientSpeechNudge] = useState(false);
   const [showTranscriptionPill, setShowTranscriptionPill] = useState(false);
   const [showSpeakingPopup, setShowSpeakingPopup] = useState(false);
   const [showSessionList, setShowSessionList] = useState(false);
@@ -76,14 +86,10 @@ export default function Home() {
   const speakingPopupTimeoutRef = useRef<number | null>(null);
   const finalTranscriptRef = useRef<string>("");
   const noSpeechTimeoutRef = useRef<number | null>(null);
-
-  const showNudge = useMemo(() => {
-    const hasRegionalScript = languagePattern.test(input);
-    const hasComplexSentence = input.trim().split(/\s+/).length >= 14;
-    return hasRegionalScript || hasComplexSentence || ambientSpeechNudge;
-  }, [ambientSpeechNudge, input]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const liveTranscript = `${finalTranscript} ${interimTranscript}`.trim();
+  const isDark = theme === "dark";
 
   useEffect(() => {
     if (!transcriptScrollRef.current) {
@@ -590,6 +596,7 @@ export default function Home() {
     setCurrentSessionId(newSession.id);
     setMessages([]);
     setInput("");
+    setSelectedUploads([]);
     setIsSending(false);
     setIsVoiceMode(false);
     setIsListening(false);
@@ -601,44 +608,150 @@ export default function Home() {
   };
 
   const sendTextMessage = () => {
-    if (!input.trim()) {
+    if (!input.trim() && selectedUploads.length === 0) {
       return;
     }
-    const toSend = input.trim();
+
+    const attachmentSummary = selectedUploads.length
+      ? `Attached files:\n${selectedUploads
+          .map((file) => `- ${file.type.startsWith("video/") ? "[Video]" : "[Image]"} ${file.name}`)
+          .join("\n")}`
+      : "";
+
+    const text = input.trim();
+    const toSend = text && attachmentSummary
+      ? `${text}\n\n${attachmentSummary}`
+      : text || attachmentSummary;
+
     setInput("");
+    setSelectedUploads([]);
     void sendMessage(toSend, "text");
   };
 
+  const onAttachClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const onFilesSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = event.target.files;
+    if (!fileList || fileList.length === 0) {
+      return;
+    }
+
+    const nextUploads: PendingUpload[] = [];
+    for (const file of Array.from(fileList)) {
+      if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
+        continue;
+      }
+      nextUploads.push({
+        id: `${file.name}-${file.lastModified}-${Math.random().toString(36).slice(2, 9)}`,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+      });
+    }
+
+    if (nextUploads.length === 0) {
+      toast.error("Please choose an image or video file.");
+      event.target.value = "";
+      return;
+    }
+
+    setSelectedUploads((prev) => [...prev, ...nextUploads]);
+    event.target.value = "";
+  };
+
+  const removeUpload = (id: string) => {
+    setSelectedUploads((prev) => prev.filter((file) => file.id !== id));
+  };
+
+  const formatUploadSize = (bytes: number) => {
+    if (bytes < 1024) {
+      return `${bytes} B`;
+    }
+    if (bytes < 1024 * 1024) {
+      return `${(bytes / 1024).toFixed(1)} KB`;
+    }
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   return (
-    <main className="flex min-h-dvh w-full flex-col overflow-hidden bg-gradient-to-b from-[#2f3685] via-[#1b2157] to-[#0d102b] text-white">
-      <header className="px-4 pb-2 pt-4 md:relative md:flex md:items-center md:px-8 md:pt-6">
-        <div className="flex items-center justify-between md:flex-1">
-          <div className="flex items-center gap-2">
-          <button
-            onClick={resetChat}
-            className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white/90 transition hover:bg-white/10"
-          >
-            New Chat
-          </button>
+    <main
+      className={cn(
+        "flex min-h-dvh w-full flex-col overflow-hidden",
+        isDark
+          ? "bg-gradient-to-b from-[#2f3685] via-[#1b2157] to-[#0d102b] text-white"
+          : "bg-white text-[#111827]"
+      )}
+    >
+      <header className="px-4 pb-2 pt-4 md:px-8 md:pt-6">
+        <div className="flex items-center justify-between">
           <button
             onClick={() => setShowSessionList((value) => !value)}
-            className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white/90 transition hover:bg-white/10"
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[34px] font-medium tracking-tight transition",
+              isDark ? "text-white hover:bg-white/10" : "text-[#111827] hover:bg-black/5"
+            )}
           >
-            Chats
+            <span className="text-[34px] leading-none md:text-[32px]">ChatGPT</span>
+            <ChevronDown className={cn("h-5 w-5", isDark ? "text-white/75" : "text-zinc-500")} />
           </button>
-          </div>
-          <p className="pointer-events-none absolute left-1/2 hidden -translate-x-1/2 text-[24px] font-medium tracking-tight md:block">ChatGPT</p>
-          <div className="flex items-center justify-end gap-2 md:flex-1">
+          <div className="flex items-center justify-end gap-2">
+            <button
+              onClick={() => setTheme((value) => (value === "dark" ? "light" : "dark"))}
+              className={cn(
+                "rounded-full p-2 transition",
+                isDark ? "hover:bg-white/10" : "hover:bg-black/5"
+              )}
+              aria-label="Toggle theme"
+            >
+              {isDark ? (
+                <Sun className="h-5 w-5 text-white/90" />
+              ) : (
+                <Moon className="h-5 w-5 text-zinc-700" />
+              )}
+            </button>
+            <button
+              onClick={resetChat}
+              className={cn(
+                "rounded-full p-2 transition",
+                isDark ? "hover:bg-white/10" : "hover:bg-black/5"
+              )}
+              aria-label="New chat"
+            >
+              <Plus className={cn("h-5 w-5", isDark ? "text-white/90" : "text-zinc-700")} />
+            </button>
             <div className="relative">
-              <button onClick={() => setShowUserMenu(!showUserMenu)} className="rounded-full p-1 hover:bg-white/10 transition">
-                <UserCircle2 className="h-6 w-6 text-white/85" />
+              <button
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                className={cn("rounded-full p-1 transition", isDark ? "hover:bg-white/10" : "hover:bg-black/5")}
+              >
+                <UserCircle2 className={cn("h-6 w-6", isDark ? "text-white/85" : "text-zinc-700")} />
               </button>
               {showUserMenu && (
-                <div className="absolute right-0 top-full mt-2 w-48 rounded-2xl border border-white/10 bg-white/5 p-3 shadow-xl backdrop-blur z-10">
+                <div
+                  className={cn(
+                    "absolute right-0 top-full z-10 mt-2 w-48 rounded-2xl border p-3 shadow-xl backdrop-blur",
+                    isDark
+                      ? "border-white/10 bg-white/5"
+                      : "border-zinc-200 bg-white"
+                  )}
+                >
                   {user ? (
                     <div className="space-y-2">
-                      <p className="text-sm text-white font-semibold">{user.displayName || user.email}</p>
-                      <button onClick={() => { signOutUser(); setShowUserMenu(false); }} className="w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
+                      <p className={cn("text-sm font-semibold", isDark ? "text-white" : "text-zinc-900")}>{user.displayName || user.email}</p>
+                      <button
+                        onClick={() => {
+                          signOutUser();
+                          setShowUserMenu(false);
+                        }}
+                        className={cn(
+                          "w-full rounded-xl border px-3 py-2 text-sm font-semibold transition",
+                          isDark
+                            ? "border-white/15 bg-white/5 text-white hover:bg-white/10"
+                            : "border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-100"
+                        )}
+                      >
                         Logout
                       </button>
                     </div>
@@ -647,7 +760,18 @@ export default function Home() {
                       <button onClick={() => { signIn(); setShowUserMenu(false); }} className="w-full rounded-xl bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-blue-700">
                         Login
                       </button>
-                      <button onClick={() => { signIn(); setShowUserMenu(false); }} className="w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
+                      <button
+                        onClick={() => {
+                          signIn();
+                          setShowUserMenu(false);
+                        }}
+                        className={cn(
+                          "w-full rounded-xl border px-3 py-2 text-sm font-semibold transition",
+                          isDark
+                            ? "border-white/15 bg-white/5 text-white hover:bg-white/10"
+                            : "border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-100"
+                        )}
+                      >
                         Sign Up
                       </button>
                     </div>
@@ -657,29 +781,40 @@ export default function Home() {
             </div>
           </div>
         </div>
-        <p className="pt-2 text-center text-[22px] font-medium tracking-tight md:hidden">ChatGPT</p>
       </header>
 
       {showSessionList && (
         <section className="px-4 pb-4 md:px-8">
-          <div className="mx-auto max-w-4xl rounded-3xl border border-white/10 bg-white/5 p-4 text-left text-white shadow-xl backdrop-blur">
+          <div
+            className={cn(
+              "mx-auto max-w-4xl rounded-3xl border p-4 text-left shadow-xl backdrop-blur",
+              isDark
+                ? "border-white/10 bg-white/5 text-white"
+                : "border-zinc-200 bg-white text-zinc-900"
+            )}
+          >
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <p className="text-lg font-semibold">Chat Sessions</p>
-                <p className="text-sm text-white/70">
+                <p className={cn("text-sm", isDark ? "text-white/70" : "text-zinc-500")}>
                   {chatSessions.length} saved session{chatSessions.length === 1 ? "" : "s"}
                 </p>
               </div>
               <button
                 onClick={() => setShowSessionList(false)}
-                className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white/90 transition hover:bg-white/10"
+                className={cn(
+                  "rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] transition",
+                  isDark
+                    ? "border-white/15 bg-white/5 text-white/90 hover:bg-white/10"
+                    : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100"
+                )}
               >
                 Close
               </button>
             </div>
             <div className="space-y-3 max-h-[280px] overflow-y-auto pr-1">
               {chatSessions.length === 0 ? (
-                <p className="text-sm text-white/70">No saved chats yet.</p>
+                <p className={cn("text-sm", isDark ? "text-white/70" : "text-zinc-500")}>No saved chats yet.</p>
               ) : (
                 chatSessions.map((session) => (
                   <button
@@ -693,27 +828,31 @@ export default function Home() {
                     className={cn(
                       "w-full rounded-2xl border px-3 py-3 text-left text-sm transition",
                       session.id === currentSessionId
-                        ? "border-blue-300 bg-white/10"
-                        : "border-white/10 bg-white/5 hover:bg-white/10"
+                        ? isDark
+                          ? "border-blue-300 bg-white/10"
+                          : "border-blue-300 bg-blue-50"
+                        : isDark
+                          ? "border-white/10 bg-white/5 hover:bg-white/10"
+                          : "border-zinc-200 bg-white hover:bg-zinc-50"
                     )}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="font-semibold text-white">{session.title}</p>
-                        <p className="mt-1 text-xs text-white/65">
+                        <p className={cn("font-semibold", isDark ? "text-white" : "text-zinc-900")}>{session.title}</p>
+                        <p className={cn("mt-1 text-xs", isDark ? "text-white/65" : "text-zinc-500")}>
                           {session.messages.length} messages
                         </p>
                       </div>
-                      <span className="text-[11px] uppercase tracking-[0.18em] text-white/60">
+                      <span className={cn("text-[11px] uppercase tracking-[0.18em]", isDark ? "text-white/60" : "text-zinc-500")}>
                         {new Date(session.createdAt).toLocaleDateString()}
                       </span>
                     </div>
                     {session.messages[session.messages.length - 1] ? (
-                      <p className="mt-3 text-[13px] leading-5 text-white/70 line-clamp-2">
+                      <p className={cn("mt-3 line-clamp-2 text-[13px] leading-5", isDark ? "text-white/70" : "text-zinc-600")}>
                         {session.messages[session.messages.length - 1].content}
                       </p>
                     ) : (
-                      <p className="mt-3 text-[13px] leading-5 text-white/70">Start a new chat.</p>
+                      <p className={cn("mt-3 text-[13px] leading-5", isDark ? "text-white/70" : "text-zinc-600")}>Start a new chat.</p>
                     )}
                   </button>
                 ))
@@ -723,47 +862,19 @@ export default function Home() {
         </section>
       )}
       <section className="flex flex-1 flex-col items-center justify-center px-4 pb-2 text-center md:px-8">
-        <div className="mb-5 rounded-2xl bg-white/95 p-2.5 shadow-xl">
-          <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-[#7c8cff] to-[#5f6aff]" />
-        </div>
-        <h1 className="text-[50px] font-semibold leading-none tracking-tight">ChatGPT</h1>
-        <p className="mt-2 text-[17px] text-white/90">How can I help you?</p>
-
-        {showNudge && (
-          <button
-            onClick={startListening}
-            className="mt-6 flex min-h-10 items-center gap-2 rounded-full bg-[#4c5cff] px-6 py-2 text-[16px] font-medium text-white shadow-[0_16px_28px_-12px_rgba(76,92,255,0.85)] transition hover:bg-[#5b68ff]"
-          >
-            {ambientSpeechNudge ? (
-              <Volume2 className="h-4 w-4" />
-            ) : (
-              <Sparkles className="h-4 w-4" />
-            )}
-            {ambientSpeechNudge
-              ? "Are you speaking? You can turn on the mic."
-              : "Speak in தமிழ் / മലയാളം?"}
-          </button>
-        )}
-
-        <div className="mt-4 flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-white/65" />
-          <span className="h-1.5 w-1.5 rounded-full bg-white/45" />
-          <span className="h-1.5 w-1.5 rounded-full bg-white/30" />
-        </div>
-        <p className="mt-2 text-[27px] font-semibold leading-none text-white">|))</p>
-        <p className="mt-1 text-[24px] leading-none text-white">Mic</p>
+        <p className={cn("text-[40px] font-medium tracking-tight md:text-[48px]", isDark ? "text-white" : "text-[#111827]")}>What can I help with?</p>
 
         <button
           onClick={isListening ? stopListening : startListening}
           className={cn(
-            "pulse-ring mt-4 flex h-[82px] w-[82px] items-center justify-center rounded-full bg-white/10 shadow-[0_18px_44px_-18px_rgba(0,0,0,0.75)] ring-1 ring-white/20 backdrop-blur transition",
-            isListening && "bg-[#4285F4] ring-[#7dafff]"
+            "pulse-ring mt-8 flex h-[104px] w-[104px] items-center justify-center rounded-full shadow-[0_18px_44px_-18px_rgba(0,0,0,0.55)] transition",
+            isDark ? "bg-[#355eb5] ring-8 ring-[#2b4a8f]" : "bg-[#3f6bd0] ring-8 ring-[#dbe6ff]"
           )}
           aria-label="Toggle voice mode"
         >
-          <Mic className="h-10 w-10" />
+          <Mic className="h-11 w-11 text-white" />
         </button>
-        <p className="mt-3 text-[16px] text-white/88">{isListening ? "Live listening mode" : "Live listening mode"}</p>
+        <p className={cn("mt-4 text-[32px] font-medium", isDark ? "text-white" : "text-[#1f2a44]")}>Listening</p>
       </section>
 
       <section className="relative px-3 pb-5 md:px-8 md:pb-7">
@@ -813,31 +924,89 @@ export default function Home() {
           </div>
         )}
 
-        <div className="mx-auto flex h-11 w-full max-w-4xl items-center gap-2 rounded-full bg-[#202547]/95 px-3 backdrop-blur ring-1 ring-white/20 md:h-12">
-          <Sparkles className="h-4 w-4 text-white/75" />
+        {selectedUploads.length > 0 && (
+          <div className="mx-auto mb-3 flex w-full max-w-3xl flex-wrap gap-2">
+            {selectedUploads.map((file) => (
+              <div
+                key={file.id}
+                className={cn(
+                  "flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs",
+                  isDark
+                    ? "border-white/20 bg-white/10 text-white"
+                    : "border-zinc-200 bg-zinc-50 text-zinc-800"
+                )}
+              >
+                <span className={cn("font-semibold", isDark ? "text-white" : "text-zinc-800")}>
+                  {file.type.startsWith("video/") ? "Video" : "Image"}
+                </span>
+                <span className="max-w-40 truncate">{file.name}</span>
+                <span className={cn(isDark ? "text-white/70" : "text-zinc-500")}>{formatUploadSize(file.size)}</span>
+                <button
+                  type="button"
+                  onClick={() => removeUpload(file.id)}
+                  className={cn(
+                    "rounded-full p-0.5 transition",
+                    isDark ? "hover:bg-white/20" : "hover:bg-zinc-200"
+                  )}
+                  aria-label={`Remove ${file.name}`}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div
+          className={cn(
+            "mx-auto flex h-14 w-full max-w-3xl items-center gap-3 rounded-full px-4 ring-1 md:h-14",
+            isDark
+              ? "bg-[#202547]/95 ring-white/20"
+              : "bg-white ring-zinc-300 shadow-[0_1px_2px_rgba(0,0,0,0.08)]"
+          )}
+        >
+          <button
+            type="button"
+            onClick={onAttachClick}
+            className={cn(
+              "rounded-full p-1 transition",
+              isDark ? "text-white/75 hover:bg-white/10" : "text-zinc-600 hover:bg-zinc-100"
+            )}
+            aria-label="Attach image or video"
+          >
+            <Plus className="h-5 w-5" />
+          </button>
           <input
             value={input}
             onChange={(event) => setInput(event.target.value)}
             onFocus={() => {
               void startAmbientDetection();
             }}
-            placeholder="Text Heorgn"
-            className="h-full flex-1 bg-transparent text-[14px] text-white outline-none placeholder:text-white/60"
+            placeholder="Ask anything"
+            className={cn(
+              "h-full flex-1 bg-transparent text-[16px] outline-none md:text-[16px]",
+              isDark ? "text-white placeholder:text-white/60" : "text-zinc-900 placeholder:text-zinc-500"
+            )}
+          />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,video/*"
+            multiple
+            className="hidden"
+            onChange={onFilesSelected}
           />
           <button
             onClick={sendTextMessage}
             disabled={isSending}
-            className="rounded-full bg-white/15 p-1.5 text-white transition hover:bg-white/25"
+            className="rounded-full bg-[#1a8cff] p-2 text-white transition hover:bg-[#1180e8]"
             aria-label="Send message"
           >
             {isSending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-5 w-5 animate-spin" />
             ) : (
-              <SendHorizontal className="h-4 w-4" />
+              <SendHorizontal className="h-5 w-5" />
             )}
-          </button>
-          <button className="rounded-full bg-white/15 p-1.5 text-white/90 transition hover:bg-white/25">
-            <Camera className="h-4 w-4" />
           </button>
         </div>
       </section>
@@ -846,7 +1015,7 @@ export default function Home() {
         <div className="fixed inset-0 z-50 flex flex-col bg-gradient-to-b from-[#20256b] via-[#161b4f] to-[#0d102d] px-4 pb-6 pt-12 text-white">
           <div className="mb-6 text-center">
             <p className="text-3xl font-semibold">ChatGPT</p>
-            <p className="mt-1 text-base text-blue-100">Live listening mode</p>
+            <p className="mt-1 text-base text-blue-100">Listening</p>
           </div>
 
           <div className="mb-8 flex flex-col items-center">
